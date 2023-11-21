@@ -1,35 +1,24 @@
+import os
+import time
+import hashlib
 import torch
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
-
-import pyaudio
-import wave
-
-import hashlib
-import os
-import time
-
-
-from TTS.api import TTS  # Make sure to import your TTS library correctly
+from TTS.api import TTS
 
 
 app = Flask(__name__)
 
-
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Device: {device}")
 
-import os
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 os.makedirs(os.path.join(script_dir, "wav"), exist_ok=True)
 os.makedirs(os.path.join(script_dir, "voices"), exist_ok=True)
 
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
-
-
-
 
 
 app.config['UPLOAD_FOLDER'] = 'voices'
@@ -67,7 +56,7 @@ def list_voices():
 
 @app.route('/audio/<filename>')
 def serve_audio_file(filename):
-    return send_from_directory(os.path.join(script_dir, "wav"), filename)
+    return send_from_directory(os.path.join(script_dir, "wav"), secure_filename(filename))
 
 @app.route('/convert', methods=['POST'])
 def convert_text():
@@ -90,57 +79,5 @@ def convert_text():
     return jsonify({'audio_url': f"/audio/{output_filename}"})
 
 
-    def find_device_index(p, partial_name):
-        """Find the first device that matches the partial name."""
-        for i in range(p.get_device_count()):
-            dev = p.get_device_info_by_index(i)
-            if partial_name in dev['name']:
-                return i
-        return None
-
-    # Create an instance of PyAudio
-    p = pyaudio.PyAudio()
-
-
-    partial_device_name = 'VoiceMeeter Inp'
-
-    # Find the device index
-    device_index = find_device_index(p, partial_device_name)
-    if device_index is None:
-        print(f"No device found with partial name '{partial_device_name}'")
-        p.terminate()
-        exit()
-
-
-    # Open the WAV file
-    wf = wave.open(output_voice, 'rb')
-
-    # Create an instance of PyAudio
-    p = pyaudio.PyAudio()
-
-    # Open a Stream with the correct settings
-    stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-                    channels=wf.getnchannels(),
-                    rate=wf.getframerate(),
-                    output=True,
-                    output_device_index=device_index)
-
-    # Read data in chunks
-    data = wf.readframes(1024)
-
-    # Play the audio file by writing to the stream
-    while data:
-        stream.write(data)
-        data = wf.readframes(1024)
-
-    # Stop and close the stream
-    stream.stop_stream()
-    stream.close()
-
-    # Close PyAudio
-    p.terminate()
-
-
-
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=False, host='0.0.0.0')
