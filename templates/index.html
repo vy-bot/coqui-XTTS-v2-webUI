@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Text to Speech</title>
+    <style>
+        body {
+            background-color: #333;
+            color: white;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        select, input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        textarea {
+            background-color: #999; /* Dark background */
+            color: black; /* Light text */
+            border: 1px solid #555; /* Slightly lighter border for visibility */
+            width: calc(100% - 25px);
+            height: 300px;
+            padding: 10px;
+            margin-top: 10px;
+            margin-right: 20px;
+            font-size: 16px;
+            line-height: normal;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        audio {
+            width: 100%;
+            margin-top: 20px;
+        }
+        #progressBarContainer {
+            width: 100%;
+            background-color: #ddd;
+            margin-top: 10px;
+            display: none; /* Initially hidden */
+        }
+        #progressBar {
+            width: 0%;
+            height: 10px;
+            background-color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+
+    <h3>Text to Speech Converter</h3>
+    <form id="ttsForm">
+        <textarea id="textInput" placeholder="Enter text here..."></textarea>
+        <br>
+        <select id="voiceSelect"></select>
+        <button type="submit">Convert to Speech</button>
+    </form>
+    <div id="progressBarContainer">
+        <div id="progressBar"></div>
+    </div>
+
+    <audio id="audioPlayer" controls style="width: 100%; margin-top: 20px;"></audio>
+
+    <br><br><br>
+
+    <h3>Upload voice to clone (WAV File, 6-60 sec.)</h3>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="fileInput" accept=".wav">
+        <button type="submit">Upload</button>
+    </form>
+
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var file = document.getElementById('fileInput').files[0];
+
+            var formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('File uploaded successfully');
+                // Handle the response
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+
+        document.getElementById('ttsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var text = document.getElementById('textInput').value;
+            var selectedVoice = document.getElementById('voiceSelect').value;
+
+            // Show the progress bar
+            var progressBarContainer = document.getElementById('progressBarContainer');
+            var progressBar = document.getElementById('progressBar');
+            progressBarContainer.style.display = 'block';
+            progressBar.style.width = '50%'; // Example: Set to 50% to indicate processing
+
+            var formData = new FormData();
+            formData.append('text', text);
+            formData.append('voice', selectedVoice);
+
+            fetch('/convert', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                var audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.src = data.audio_url;
+                audioPlayer.play();
+                progressBar.style.width = '100%'; // Complete the progress
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                progressBar.style.width = '0%'; // Reset progress on error
+            })
+            .finally(() => {
+                // Hide the progress bar after a short delay
+                setTimeout(() => {
+                    progressBarContainer.style.display = 'none';
+                    progressBar.style.width = '0%';
+                }, 1000);
+            });
+        });
+
+        // Function to load voices
+        function loadVoices() {
+            fetch('/voices')
+                .then(response => response.json())
+                .then(data => {
+                    var select = document.getElementById('voiceSelect');
+                    data.forEach(function(voice) {
+                        var option = document.createElement('option');
+                        option.value = voice;
+                        option.textContent = voice;
+                        select.appendChild(option);
+                    });
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadVoices);
+    </script>
+</body>
+</html>
