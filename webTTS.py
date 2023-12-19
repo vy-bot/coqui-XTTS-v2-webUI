@@ -13,6 +13,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Device: {device}")
 
 
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 os.makedirs(os.path.join(script_dir, "wav"), exist_ok=True)
@@ -62,6 +63,9 @@ def serve_audio_file(filename):
 def convert_text():
     text = request.form['text']
     voice_filename = request.form['voice']
+    voice_language = request.form.get('language', 'en')
+    print('voice',voice_filename)
+    print('language',voice_language)
 
     # Find the full path of the selected voice file
     voice_file_path = os.path.join('voices', voice_filename)
@@ -74,10 +78,49 @@ def convert_text():
     output_path = f"{script_dir}/wav/{output_filename}"
 
     # Save the output to a file
-    tts.tts_to_file(text=text, speaker_wav=target_voice, language="en", file_path=output_path)
+    tts.tts_to_file(text=text, speaker_wav=target_voice, file_path=output_path, language=voice_language)
 
     return jsonify({'audio_url': f"/audio/{output_filename}"})
+
+from flask import send_file
+from pydub import AudioSegment
+import io
+@app.route('/api/tts', methods=['GET'])
+def api_tts():
+    text = request.args.get('text', 'This is a test!')
+    style_wav = request.args.get('style_wav', 'default.wav')
+    language_id = request.args.get('language_id', 'en')
+    speaker_id = request.args.get('speaker_id', '')
+    print(text)
+    if not style_wav:
+        style_wav = 'default.wav'
+    if not language_id:
+        language_id = 'en'
+    if not text:
+        text = 'No text provided.'
+
+    if not text or not style_wav:
+        return jsonify({'error': 'Missing text or style_wav parameter'}), 400
+
+    # Find the full path of the selected style wav file
+    style_wav_path = os.path.join('voices', style_wav)
+    if not os.path.exists(style_wav_path):
+        return jsonify({'error': 'style_wav file not found'}), 404
+
+    unique_string = text + str(time.time())
+    filename_hash = hashlib.md5(unique_string.encode()).hexdigest()
+    output_filename = f"{filename_hash}.wav"
+    output_path = f"{script_dir}/wav/{output_filename}"
+
+    # Save the output to a file
+    tts.tts_to_file(text=text, speaker_wav=style_wav_path, file_path=output_path, language=language_id)
+
+    # Return the file content
+    with open(output_path, 'rb') as f:
+        data = io.BytesIO(f.read())
+    return send_file(data, mimetype='audio/wav', as_attachment=True, download_name=output_filename)
 
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0')
+
